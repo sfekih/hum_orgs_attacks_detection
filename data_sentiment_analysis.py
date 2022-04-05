@@ -30,8 +30,13 @@ if __name__ == '__main__':
 
     data_df = pd.read_csv(args.data_path, compression='gzip').drop_duplicates(inplace=False)
 
+    
     if args.use_sample == 'true':
-        data_df = data_df.head()
+        final_df = pd.DataFrame()
+        for lang in ['en', 'fr', 'ar']:
+            final_df = final_df.append(data_df[data_df.language==lang].sample(frac=0.2))
+
+        data_df = final_df
 
     data_original = data_df.tweet.tolist()
 
