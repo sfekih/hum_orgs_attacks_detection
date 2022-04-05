@@ -19,7 +19,7 @@ def preprocess(text):
         new_text.append(t)
     return " ".join(new_text)
 
-if __name__=='main':
+if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
 
