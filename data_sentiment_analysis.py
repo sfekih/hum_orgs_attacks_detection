@@ -66,7 +66,7 @@ if __name__ == '__main__':
 
         for i in range (len(labels)):
             label = labels[i]
-            data_df[label] = data_df['score'].apply(lambda x: x[i])
+            data_df[label] = data_df['scores'].apply(lambda x: x[i])
         
         data_df.drop(columns=['scores'], inplace=True)
         data_df.to_csv(f'sentiments_analysis.csv', index=None)
