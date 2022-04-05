@@ -28,7 +28,7 @@ if __name__ == '__main__':
 
     args, _ = parser.parse_known_args()
 
-    data_df = pd.read_csv(args.data_path).drop_duplicates(inplace=False)
+    data_df = pd.read_csv(args.data_path, compression='gzip').drop_duplicates(inplace=False)
 
     if args.use_sample == 'true':
         data_df = data_df.head()
@@ -64,9 +64,16 @@ if __name__ == '__main__':
 
         data_df['scores'] = tot_scores
 
-        for i in range (len(labels)):
-            label = labels[i]
-            data_df[label] = data_df['scores'].apply(lambda x: x[i])
+        n_labels = len(labels)
+
+        if n_labels==2:
+            first_label = labels[1]
+            data_df[first_label] = data_df['scores'].apply(lambda x: x[1])
+
+        else:
+            for i in range (n_labels):
+                label = labels[i]
+                data_df[label] = data_df['scores'].apply(lambda x: x[i])
         
         data_df.drop(columns=['scores'], inplace=True)
-        data_df.to_csv(f'sentiments_analysis.csv', index=None)
+        data_df.to_json(f'sentiments_analysis.json', index=None, compression='gzip')
