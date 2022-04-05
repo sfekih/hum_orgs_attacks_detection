@@ -76,4 +76,4 @@ if __name__ == '__main__':
                 data_df[label] = data_df['scores'].apply(lambda x: x[i])
         
         data_df.drop(columns=['scores'], inplace=True)
-        data_df.to_json(f'sentiments_analysis.json', index=None, compression='gzip')
+        data_df.to_csv(f'sentiments_analysis.json', index=None, compression='gzip')
