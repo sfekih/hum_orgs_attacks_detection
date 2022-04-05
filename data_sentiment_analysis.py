@@ -37,7 +37,7 @@ if __name__ == '__main__':
 
     tasks = ['offensive', 'emotion', 'irony']
 
-    for task in tqdm(tasks):
+    for task in tasks:
 
         MODEL = f"cardiffnlp/twitter-roberta-base-{task}"
 
@@ -53,7 +53,7 @@ if __name__ == '__main__':
         model = AutoModelForSequenceClassification.from_pretrained(MODEL)
         tot_scores = []
 
-        for tweet in data_original:
+        for tweet in tqdm(data_original):
 
             text = preprocess(tweet)
             encoded_input = tokenizer(text, return_tensors='pt')
