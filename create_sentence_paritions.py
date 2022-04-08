@@ -1,3 +1,4 @@
+from typing import List
 import numpy as np
 import pandas as pd
 
@@ -28,9 +29,7 @@ import argparse
 
 
 
-def clean_tweets(row):
-    sentence = row['tweet']
-    language = row['language']
+def clean_tweets(sentence, language: str):
 
     if type(sentence) is not str:
         sentence = str(sentence)
@@ -62,63 +61,43 @@ def clean_tweets(row):
     return ' '.join(new_words)
 
 
-if __name__ == '__main__':
+def get_louvain_partitions(df):
 
-    parser = argparse.ArgumentParser()
+    original_tweets = df.tweet.tolist() 
+    language = df.language
 
-    parser.add_argument("--use_sample", type=str, default='false')
-    parser.add_argument('--data_path', type=str, default='data/clean_data_march.csv')
+    cleaned_tweet = [clean_tweets(one_tweet, language) for one_tweet in original_tweets] 
 
-    args, _ = parser.parse_known_args()
+    #define and use tf-idf transformation
+    tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0)
+    tf_idf = tf.fit_transform(cleaned_tweet)
 
-    data_original = pd.read_csv(args.data_path).drop_duplicates(inplace=False)
+    # get cosine similarity matrix
+    cosine_similarity_matrix = linear_kernel(tf_idf, tf_idf)
 
-    if args.use_sample == 'true':
-        data_original = data_original.head()
+    # create graph from similarity matrix
+    graph_one_lang = nx.Graph()
+    matrix_shape = cosine_similarity_matrix.shape
+    for i in range (matrix_shape[0]):
+        for j in range (matrix_shape[1]):
+            #do only once
+            if i < j:
+                sim = cosine_similarity_matrix[i, j]
+                graph_one_lang.add_edge(i, j, weight=sim)
+                graph_one_lang.add_edge(j, i, weight=sim)
 
-    treated_languages = ['en', 'ar', 'fr']
+    # louvain community
+    partition = community.best_partition(graph_one_lang)
 
-    data_original['cleaned_tweet'] = data_original.apply(lambda x: clean_tweets(x), axis=1)
+    partitioned_sentences = {original_tweets[key]: val for key, val in partition.items()}
 
-    for lang in tqdm(treated_languages[::-1]) :
+    df_partition = pd.DataFrame(
+        list(zip(
+            list(partitioned_sentences.keys()), 
+            list(partitioned_sentences.values())
+            )),
+        
+        columns=['tweet_id', 'partition']
+    ).sort_values(by='partition', inplace=False)
 
-        # keep only needed language
-        df_tmp = data_original[data_original['language'] == lang].drop_duplicates(inplace=False)
-        if lang=='en':
-            df_tmp = df_tmp.sample(frac=0.3)
-        clean_data_one_lang = df_tmp.cleaned_tweet.tolist()
-        original_data_one_lang = df_tmp.tweet.tolist()
-
-        #define and use tf-idf transformation
-        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0)
-        tf_idf = tf.fit_transform(clean_data_one_lang)
-
-        # get cosine similarity matrix
-        cosine_similarity_matrix = linear_kernel(tf_idf, tf_idf)
-
-        # create graph from similarity matrix
-        graph_one_lang = nx.Graph()
-        matrix_shape = cosine_similarity_matrix.shape
-        for i in range (matrix_shape[0]):
-            for j in range (matrix_shape[1]):
-                #do only once
-                if i < j:
-                    sim = cosine_similarity_matrix[i, j]
-                    graph_one_lang.add_edge(i, j, weight=sim)
-                    graph_one_lang.add_edge(j, i, weight=sim)
-
-        # louvain community
-        partition = community.best_partition(graph_one_lang)
-        partitioned_sentences = {original_data_one_lang[key]: val for key, val in partition.items()}
-
-        df_partitions = pd.DataFrame(
-            list(zip(
-                list(partitioned_sentences.keys()), 
-                list(partitioned_sentences.values())
-                )),
-            
-            columns=['data', 'partition']
-        ).sort_values(by='partition', inplace=False)
-
-        df_partitions.to_csv(f'march_data_partitions_{lang}.csv', index=None)
-    
+    return df_partition
