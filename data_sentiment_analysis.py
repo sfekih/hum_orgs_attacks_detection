@@ -30,7 +30,7 @@ args, _ = parser.parse_known_args()
 
 def preprocess(text: str, process_tags: bool = True):
     new_text = []
-    for t in text.split(" "):
+    for t in str(text).split(" "):
         if process_tags:
             t = '@user' if t.startswith('@') and len(t) > 1 else t
         t = 'http' if t.startswith('http') else t
@@ -109,7 +109,7 @@ if __name__ == '__main__':
     print('----------------------------------------------------------------')
 
     data_df = pd.read_csv(args.data_path, compression='gzip')
-    
+
     data_df['tweet'] = data_df.tweet.apply(
         lambda x: preprocess(x, process_tags=False)
     )
