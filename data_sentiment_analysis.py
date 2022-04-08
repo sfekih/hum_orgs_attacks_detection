@@ -97,11 +97,7 @@ def get_overall_negative_score(df):
         col_values = sentiments_df[task]
         sentiments_df[task] = col_values.mean() / col_values.std()
 
-    sentiments_df['overall_score']= sentiments_df[
-            kept_sentiments
-            ].mean(axis=1)
-
-    return sentiments_df['overall_score']
+    return sentiments_df[kept_sentiments].mean(axis=1)
 
 if __name__ == '__main__':
 
@@ -119,8 +115,9 @@ if __name__ == '__main__':
         data_df = final_df
     
 
-    for language_tmp in languages:
+    for language_tmp in languages[-1]:
 
+        print(f'------------ begin getting sentiments for {language_tmp}')
         data_one_language = data_df[data_df.language==language_tmp]
         data_one_language.drop(columns='language', inplace=True)
 
@@ -131,7 +128,6 @@ if __name__ == '__main__':
         # compute mean of three tasks
         sentiments_df_one_language['overall_negative_sentiment'] = get_overall_negative_score(sentiments_df_one_language)
         
-        print(f'begin getting sentiments for {language_tmp}')
         sentiments_df_one_language.to_csv(
             f'generated_data/sentiments_numbers_{language_tmp}.csv', index=None, compression='gzip'
             )
@@ -143,7 +139,7 @@ if __name__ == '__main__':
             inplace=False
             ).head(n_kept_tweets)
 
-        print(f'begin getting partitions for {language_tmp}')
+        print(f'----------------- begin getting partitions for {language_tmp}')
         partitioned_df = get_louvain_partitions(kept_df, language_tmp)
 
         partitioned_df.to_csv(
