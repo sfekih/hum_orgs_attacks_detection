@@ -125,7 +125,7 @@ if __name__ == '__main__':
         data_df = final_df
     
 
-    for language_tmp in languages:
+    for language_tmp in ['fr']:# languages:
 
         print(f'------------ begin getting sentiments for {language_tmp}')
         data_one_language = data_df[data_df.language==language_tmp]
