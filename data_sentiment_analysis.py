@@ -122,7 +122,7 @@ if __name__ == '__main__':
         sentiments_df_one_language['overall_negative_sentiment'] = get_overall_negative_score(sentiments_df_one_language)
         
         sentiments_df_one_language.to_csv(
-            f'sentiments_numbers_{language_tmp}.csv', index=None, compression='gzip'
+            f'generated_data/sentiments_numbers_{language_tmp}.csv', index=None, compression='gzip'
             )
 
         n_kept_tweets = int(n_tweets_one_language * args.proportion_kept_data)
@@ -135,5 +135,5 @@ if __name__ == '__main__':
         partitioned_df = get_louvain_partitions(kept_df)
 
         partitioned_df.to_csv(
-            f'partitions_{language_tmp}.csv', index=None, compression='gzip'
+            f'generated_data/partitions_{language_tmp}.csv', index=None, compression='gzip'
         )
