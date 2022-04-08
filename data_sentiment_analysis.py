@@ -97,9 +97,9 @@ def get_overall_negative_score(df):
         col_values = sentiments_df[task]
         mean = col_values.mean()
         std = col_values.std()
-        sentiments_df[task] = (sentiments_df[task] - mean) / std
+        sentiments_df[task] = (col_values - mean) / std
 
-    return sentiments_df[kept_sentiments].mean(axis=1)
+    return sentiments_df[kept_sentiments].sum(axis=1)
 
 if __name__ == '__main__':
 
@@ -108,6 +108,7 @@ if __name__ == '__main__':
     print('----------------------------------------------------------------')
 
     data_df = pd.read_csv(args.data_path, compression='gzip').drop_duplicates(inplace=False)
+    data_df['tweet_id'] = data_df.index
     
     if args.use_sample == 'true':
         final_df = pd.DataFrame()

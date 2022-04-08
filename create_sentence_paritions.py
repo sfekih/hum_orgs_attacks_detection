@@ -64,7 +64,7 @@ def clean_tweets(sentence, language: str):
 def get_louvain_partitions(df: pd.DataFrame, language: str):
 
     original_tweets = df.tweet.tolist() 
-
+    tweet_ids = df.tweet_id.tolist() 
     cleaned_tweet = [clean_tweets(one_tweet, language) for one_tweet in original_tweets] 
 
     #define and use tf-idf transformation
@@ -88,15 +88,22 @@ def get_louvain_partitions(df: pd.DataFrame, language: str):
     # louvain community
     partition = community.best_partition(graph_one_lang)
 
-    partitioned_sentences = {original_tweets[key]: val for key, val in partition.items()}
+    ids = []
+    tweets = []
+    partitions = []
+    for key, val in partition.items():
+        ids.append(tweet_ids[key])
+        tweets.append(original_tweets[key])
+        partitions.append(val)
 
     df_partition = pd.DataFrame(
         list(zip(
-            list(partitioned_sentences.keys()), 
-            list(partitioned_sentences.values())
+            ids, 
+            tweets,
+            partitions
             )),
         
-        columns=['tweet_id', 'partition']
+        columns=['tweet_id', 'sentence', 'partition']
     ).sort_values(by='partition', inplace=False)
 
     return df_partition
