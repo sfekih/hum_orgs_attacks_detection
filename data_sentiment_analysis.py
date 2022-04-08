@@ -1,3 +1,4 @@
+from yaml import parse
 from transformers import AutoModelForSequenceClassification
 from transformers import AutoTokenizer
 
@@ -11,22 +12,24 @@ import urllib.request
 from tqdm import tqdm
 import argparse
 from typing import List
+from ast import literal_eval
 
 from create_sentence_paritions import get_louvain_partitions
 
 
 classification_tasks = ['offensive', 'emotion', 'irony']
 kept_sentiments = ['offensive', 'anger', 'irony']
-languages = ['en', 'ar', 'fr']
 
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--use_sample", type=str, default='false')
 parser.add_argument('--data_path', type=str, default='data/clean_data_march.csv')
 parser.add_argument('--proportion_kept_data', type=float, default=0.1)
+parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 
 args, _ = parser.parse_known_args()
 
+languages = literal_eval(args.trained_languages)
 
 def preprocess(text: str, process_tags: bool = True):
     new_text = []
@@ -125,7 +128,7 @@ if __name__ == '__main__':
         data_df = final_df
     
 
-    for language_tmp in ['fr']:# languages:
+    for language_tmp in languages:
 
         print(f'------------ begin getting sentiments for {language_tmp}')
         data_one_language = data_df[data_df.language==language_tmp]
