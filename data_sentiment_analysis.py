@@ -107,7 +107,7 @@ if __name__ == '__main__':
     if args.use_sample == 'true':
         final_df = pd.DataFrame()
         for lang in ['en', 'fr', 'ar']:
-            final_df = final_df.append(data_df[data_df.language==lang].sample(frac=0.05))
+            final_df = final_df.append(data_df[data_df.language==lang].sample(frac=0.01))
 
         data_df = final_df
     
