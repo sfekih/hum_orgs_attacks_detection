@@ -28,14 +28,15 @@ parser.add_argument('--proportion_kept_data', type=float, default=0.1)
 args, _ = parser.parse_known_args()
 
 
-def preprocess(text):
+def preprocess(text: str, process_tags: bool = True):
     new_text = []
     for t in text.split(" "):
-        t = '@user' if t.startswith('@') and len(t) > 1 else t
+        if process_tags:
+            t = '@user' if t.startswith('@') and len(t) > 1 else t
         t = 'http' if t.startswith('http') else t
         new_text.append(t)
     return " ".join(new_text)
-
+    
 
 def get_sentiment_one_task(tweets_list: List[str], task: str):
     MODEL = f"cardiffnlp/twitter-roberta-base-{task}"
@@ -107,7 +108,13 @@ if __name__ == '__main__':
     print('---------------------- BEGIN TRAINING --------------------------')
     print('----------------------------------------------------------------')
 
-    data_df = pd.read_csv(args.data_path, compression='gzip').drop_duplicates(inplace=False)
+    data_df = pd.read_csv(args.data_path, compression='gzip')
+    
+    data_df['tweet'] = data_df.tweet.apply(
+        lambda x: preprocess(x, process_tags=False)
+    )
+
+    data_df.drop_duplicates(inplace=True)
     data_df['tweet_id'] = data_df.index
     
     if args.use_sample == 'true':
