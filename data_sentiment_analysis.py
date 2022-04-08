@@ -95,7 +95,9 @@ def get_overall_negative_score(df):
     #normalize scores
     for task in kept_sentiments:
         col_values = sentiments_df[task]
-        sentiments_df[task] = col_values.mean() / col_values.std()
+        mean = col_values.mean()
+        std = col_values.std()
+        sentiments_df[task] = (sentiments_df[task] - mean) / std
 
     return sentiments_df[kept_sentiments].mean(axis=1)
 
@@ -115,7 +117,7 @@ if __name__ == '__main__':
         data_df = final_df
     
 
-    for language_tmp in [languages[-1]]:
+    for language_tmp in languages:
 
         print(f'------------ begin getting sentiments for {language_tmp}')
         data_one_language = data_df[data_df.language==language_tmp]
