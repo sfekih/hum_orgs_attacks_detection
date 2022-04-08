@@ -68,7 +68,10 @@ def get_negative_sentiments(df: pd.DataFrame):
     tweets_list = data_one_language.tweet.tolist()
     data_df = df.copy()
 
+
     for task in classification_tasks:
+
+        print(f'begin getting scores for {task}')
 
         tot_scores, labels = get_sentiment_one_task(tweets_list, task)
 
@@ -102,6 +105,10 @@ def get_overall_negative_score(df):
 
 if __name__ == '__main__':
 
+    print('----------------------------------------------------------------')
+    print('---------------------- BEGIN TRAINING --------------------------')
+    print('----------------------------------------------------------------')
+
     data_df = pd.read_csv(args.data_path, compression='gzip').drop_duplicates(inplace=False)
     
     if args.use_sample == 'true':
@@ -113,7 +120,10 @@ if __name__ == '__main__':
     
 
     for language_tmp in languages:
+
         data_one_language = data_df[data_df.language==language_tmp]
+        data_one_language.drop(columns='language', inplace=True)
+
         n_tweets_one_language = len(data_one_language)
 
         sentiments_df_one_language = get_negative_sentiments(data_one_language)
@@ -121,6 +131,7 @@ if __name__ == '__main__':
         # compute mean of three tasks
         sentiments_df_one_language['overall_negative_sentiment'] = get_overall_negative_score(sentiments_df_one_language)
         
+        print(f'begin getting sentiments for {language_tmp}')
         sentiments_df_one_language.to_csv(
             f'generated_data/sentiments_numbers_{language_tmp}.csv', index=None, compression='gzip'
             )
@@ -132,8 +143,13 @@ if __name__ == '__main__':
             inplace=False
             ).head(n_kept_tweets)
 
-        partitioned_df = get_louvain_partitions(kept_df)
+        print(f'begin getting partitions for {language_tmp}')
+        partitioned_df = get_louvain_partitions(kept_df, language_tmp)
 
         partitioned_df.to_csv(
             f'generated_data/partitions_{language_tmp}.csv', index=None, compression='gzip'
         )
+
+    print('----------------------------------------------------------------')
+    print('---------------------- TRAINING SUCCESSFUL! --------------------')
+    print('----------------------------------------------------------------')

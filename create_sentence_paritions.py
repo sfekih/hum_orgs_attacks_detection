@@ -61,10 +61,9 @@ def clean_tweets(sentence, language: str):
     return ' '.join(new_words)
 
 
-def get_louvain_partitions(df):
+def get_louvain_partitions(df: pd.DataFrame, language: str):
 
     original_tweets = df.tweet.tolist() 
-    language = df.language
 
     cleaned_tweet = [clean_tweets(one_tweet, language) for one_tweet in original_tweets] 
 
