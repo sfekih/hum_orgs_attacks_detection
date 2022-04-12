@@ -14,8 +14,6 @@ import argparse
 from typing import List
 from ast import literal_eval
 
-from create_sentence_paritions import get_louvain_partitions
-
 
 classification_tasks = ['offensive', 'emotion', 'irony']
 kept_sentiments = ['offensive', 'anger', 'irony']
@@ -24,7 +22,6 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--use_sample", type=str, default='false')
 parser.add_argument('--data_path', type=str, default='data/clean_data_march.csv')
-parser.add_argument('--proportion_kept_data', type=float, default=0.1)
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 
 args, _ = parser.parse_known_args()
@@ -107,9 +104,9 @@ def get_overall_negative_score(df):
 
 if __name__ == '__main__':
 
-    print('----------------------------------------------------------------')
-    print('---------------------- BEGIN TRAINING --------------------------')
-    print('----------------------------------------------------------------')
+    print('---------------------------------------------------------------------------------')
+    print('---------------------- BEGIN RUNNING SENTIMENTS SCRIPT --------------------------')
+    print('---------------------------------------------------------------------------------')
 
     data_df = pd.read_csv(args.data_path, compression='gzip')
 
@@ -134,7 +131,7 @@ if __name__ == '__main__':
         data_one_language = data_df[data_df.language==language_tmp]
         data_one_language.drop(columns='language', inplace=True)
 
-        n_tweets_one_language = len(data_one_language)
+        
 
         sentiments_df_one_language = get_negative_sentiments(data_one_language)
 
@@ -145,20 +142,6 @@ if __name__ == '__main__':
             f'generated_data/sentiments_numbers_{language_tmp}.csv', index=None, compression='gzip'
             )
 
-        n_kept_tweets = int(n_tweets_one_language * args.proportion_kept_data)
-        kept_df = sentiments_df_one_language.sort_values(
-            by='overall_negative_sentiment',
-            ascending=False,
-            inplace=False
-            ).head(n_kept_tweets)
-
-        print(f'----------------- begin getting partitions for {language_tmp}')
-        partitioned_df = get_louvain_partitions(kept_df, language_tmp)
-
-        partitioned_df.to_csv(
-            f'generated_data/partitions_{language_tmp}.csv', index=None, compression='gzip'
-        )
-
-    print('----------------------------------------------------------------')
-    print('---------------------- TRAINING SUCCESSFUL! --------------------')
-    print('----------------------------------------------------------------')
+    print('--------------------------------------------------------------------')
+    print('---------------------- SCRIPT RUN SUCCESSFULLY! --------------------')
+    print('--------------------------------------------------------------------')

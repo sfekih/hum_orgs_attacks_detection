@@ -27,7 +27,12 @@ import community.community_louvain as community
 from tqdm import tqdm
 import argparse
 
+parser = argparse.ArgumentParser()
 
+parser.add_argument('--proportion_kept_data', type=float, default=0.1)
+parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
+
+args, _ = parser.parse_known_args()
 
 def clean_tweets(sentence, language: str):
 
@@ -107,3 +112,34 @@ def get_louvain_partitions(df: pd.DataFrame, language: str):
     ).sort_values(by='partition', inplace=False)
 
     return df_partition
+
+if __name__ == '__main__':
+
+    print('--------------------------------------------------------------------------------')
+    print('---------------------- BEGIN RUNNING PRTITIONS SCRIPT --------------------------')
+    print('--------------------------------------------------------------------------------')
+
+    for language_tmp in args.trained_languages:
+
+        sentiments_df_one_language = pd.read_csv(
+            f'generated_data/sentiments_numbers_{language_tmp}.csv', 
+            compression='gzip'
+            )
+
+        n_tweets_one_language = len(sentiments_df_one_language)
+        n_kept_tweets = int(n_tweets_one_language * args.proportion_kept_data)
+        kept_df = sentiments_df_one_language.sort_values(
+            by='overall_negative_sentiment',
+            ascending=False,
+            inplace=False
+            ).head(n_kept_tweets)
+
+        partitioned_df = get_louvain_partitions(kept_df, language_tmp)
+
+        partitioned_df.to_csv(
+            f'generated_data/partitions_{language_tmp}.csv', index=None, compression='gzip'
+        )
+
+    print('--------------------------------------------------------------------')
+    print('---------------------- SCRIPT RUN SUCCESSFULLY! --------------------')
+    print('--------------------------------------------------------------------')
