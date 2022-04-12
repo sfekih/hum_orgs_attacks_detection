@@ -24,7 +24,7 @@ from sklearn.metrics.pairwise import linear_kernel
 
 import networkx as nx
 import community.community_louvain as community
-from tqdm import tqdm
+from ast import literal_eval
 import argparse
 
 parser = argparse.ArgumentParser()
@@ -33,6 +33,8 @@ parser.add_argument('--proportion_kept_data', type=float, default=0.1)
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 
 args, _ = parser.parse_known_args()
+
+languages = literal_eval(args.trained_languages)
 
 def clean_tweets(sentence, language: str):
 
@@ -119,7 +121,7 @@ if __name__ == '__main__':
     print('---------------------- BEGIN RUNNING PRTITIONS SCRIPT --------------------------')
     print('--------------------------------------------------------------------------------')
 
-    for language_tmp in args.trained_languages:
+    for language_tmp in languages:
 
         sentiments_df_one_language = pd.read_csv(
             f'generated_data/sentiments_numbers_{language_tmp}.csv', 
