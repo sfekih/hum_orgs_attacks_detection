@@ -106,7 +106,13 @@ def get_sentiments_ar(df: pd.DataFrame):
     data_df = df.copy()
     tweets = data_df.tweet.tolist()
     sa = pipeline('sentiment-analysis', model='CAMeL-Lab/bert-base-arabic-camelbert-mix-sentiment')
-    model_returns = sa(tweets)
+
+    model_returns = []
+    batch_size = 32
+    for i in tqdm(range(0, len(tweets), batch_size)):
+        batch = tweets[i:i+batch_size]
+        model_returns = sa(batch)
+        model_returns += model_returns
 
     negative_scores = np.array([one_return['score'] if one_return['label']=='negative' else 1 - one_return['score'] for one_return in model_returns])
     mean = np.mean(negative_scores)
