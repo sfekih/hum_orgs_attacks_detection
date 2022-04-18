@@ -111,8 +111,8 @@ def get_sentiments_ar(df: pd.DataFrame):
     batch_size = 32
     for i in tqdm(range(0, len(tweets), batch_size)):
         batch = tweets[i:i+batch_size]
-        model_returns = sa(batch)
-        model_returns += model_returns
+        model_returns_one_batch = sa(batch)
+        model_returns += model_returns_one_batch
 
     negative_scores = np.array([one_return['score'] if one_return['label']=='negative' else 1 - one_return['score'] for one_return in model_returns])
     mean = np.mean(negative_scores)
