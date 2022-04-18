@@ -1,12 +1,9 @@
-from yaml import parse
-from transformers import AutoModelForSequenceClassification
-from transformers import AutoTokenizer
+from transformers import AutoModelForSequenceClassification, AutoTokenizer, pipeline
 
 import numpy as np
 import pandas as pd
 from scipy.special import softmax
 
-import json
 import csv
 import urllib.request
 from tqdm import tqdm
@@ -38,37 +35,49 @@ def preprocess(text: str, process_tags: bool = True):
     return " ".join(new_text)
     
 
-def get_sentiment_one_task(tweets_list: List[str], task: str):
-    MODEL = f"cardiffnlp/twitter-roberta-base-{task}"
+def get_sentiments_non_ar(df: pd.DataFrame):
 
-    tokenizer = AutoTokenizer.from_pretrained(MODEL)
+    def get_sentiment_one_task(tweets_list: List[str], task: str):
+        MODEL = f"cardiffnlp/twitter-roberta-base-{task}"
 
-    # download label mapping
-    mapping_link = f"https://raw.githubusercontent.com/cardiffnlp/tweeteval/main/datasets/{task}/mapping.txt"
-    with urllib.request.urlopen(mapping_link) as f:
-        html = f.read().decode('utf-8').split("\n")
-        csvreader = csv.reader(html, delimiter='\t')
-    labels = [row[1] for row in csvreader if len(row) > 1]
+        tokenizer = AutoTokenizer.from_pretrained(MODEL)
 
-    model = AutoModelForSequenceClassification.from_pretrained(MODEL)
-    tot_scores = []
+        # download label mapping
+        mapping_link = f"https://raw.githubusercontent.com/cardiffnlp/tweeteval/main/datasets/{task}/mapping.txt"
+        with urllib.request.urlopen(mapping_link) as f:
+            html = f.read().decode('utf-8').split("\n")
+            csvreader = csv.reader(html, delimiter='\t')
+        labels = [row[1] for row in csvreader if len(row) > 1]
 
-    for tweet_tmp in tqdm(tweets_list):
+        model = AutoModelForSequenceClassification.from_pretrained(MODEL)
+        tot_scores = []
 
-        text = preprocess(tweet_tmp)
-        encoded_input = tokenizer(text, return_tensors='pt')
-        output = model(**encoded_input)
-        scores = output[0][0].detach().numpy()
-        scores = softmax(scores)
-        tot_scores.append(scores)
+        for tweet_tmp in tqdm(tweets_list):
 
-    return tot_scores, labels
+            text = preprocess(tweet_tmp)
+            encoded_input = tokenizer(text, return_tensors='pt')
+            output = model(**encoded_input)
+            scores = output[0][0].detach().numpy()
+            scores = softmax(scores)
+            tot_scores.append(scores)
 
-def get_negative_sentiments(df: pd.DataFrame):
+        return tot_scores, labels
 
-    tweets_list = data_one_language.tweet.tolist()
+    def get_overall_negative_score(df):
+
+        sentiments_df = df.copy()
+
+        #normalize scores
+        for task in kept_sentiments:
+            col_values = sentiments_df[task]
+            mean = col_values.mean()
+            std = col_values.std()
+            sentiments_df[task] = (col_values - mean) / std
+
+        return sentiments_df[kept_sentiments].sum(axis=1)
+
     data_df = df.copy()
-
+    tweets_list = data_df.tweet.tolist()
 
     for task in classification_tasks:
 
@@ -87,20 +96,33 @@ def get_negative_sentiments(df: pd.DataFrame):
         
         data_df.drop(columns=['scores'], inplace=True)
 
+    # compute mean of three tasks
+    data_df['overall_negative_sentiment'] = get_overall_negative_score(data_df)
+
     return data_df
 
-def get_overall_negative_score(df):
+def get_sentiments_ar(df: pd.DataFrame):
 
-    sentiments_df = df.copy()
+    data_df = df.copy()
+    tweets = data_df.tweet.tolist()
+    sa = pipeline('sentiment-analysis', model='CAMeL-Lab/bert-base-arabic-camelbert-mix-sentiment')
+    model_returns = sa(tweets)
 
-    #normalize scores
-    for task in kept_sentiments:
-        col_values = sentiments_df[task]
-        mean = col_values.mean()
-        std = col_values.std()
-        sentiments_df[task] = (col_values - mean) / std
+    negative_scores = np.array([one_return['score'] if one_return['label']=='negative' else 1 - one_return['score'] for one_return in model_returns])
+    mean = np.mean(negative_scores)
+    std = np.std(negative_scores)
 
-    return sentiments_df[kept_sentiments].sum(axis=1)
+    data_df['overall_negative_sentiment'] = (negative_scores - mean) / std
+
+    return data_df
+
+def get_negative_sentiments(df: pd.DataFrame, language: str):
+
+    if language=='ar':
+        return get_sentiments_ar(df)
+    else:
+        return get_sentiments_non_ar(df)  
+    
 
 if __name__ == '__main__':
 
@@ -131,12 +153,7 @@ if __name__ == '__main__':
         data_one_language = data_df[data_df.language==language_tmp]
         data_one_language.drop(columns='language', inplace=True)
 
-        
-
-        sentiments_df_one_language = get_negative_sentiments(data_one_language)
-
-        # compute mean of three tasks
-        sentiments_df_one_language['overall_negative_sentiment'] = get_overall_negative_score(sentiments_df_one_language)
+        sentiments_df_one_language = get_negative_sentiments(data_one_language, language_tmp)
         
         sentiments_df_one_language.to_csv(
             f'generated_data/sentiments_numbers_{language_tmp}.csv', index=None, compression='gzip'
