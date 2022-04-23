@@ -9,18 +9,16 @@ import nltk
 nltk.download('stopwords')
 nltk.download('wordnet')
 nltk.download('omw-1.4')
-
 from nltk.corpus import stopwords
 from nltk.stem import WordNetLemmatizer
 wordnet_lemmatizer = WordNetLemmatizer()
-
 from nltk.stem import PorterStemmer  
 porter_stemmer = PorterStemmer()
-
 stop_words = set(stopwords.words())
 
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import linear_kernel
+from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 import networkx as nx
 import community.community_louvain as community
@@ -29,12 +27,14 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--proportion_kept_data', type=float, default=0.1)
+parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.1, 'en': 0.02, 'ar': 0.1}")
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
+parser.add_argument('--method_similarity', type=str, default="embeddings")
 
 args, _ = parser.parse_known_args()
 
 languages = literal_eval(args.trained_languages)
+proportions_kept_data = literal_eval(args.proportion_kept_data)
 
 def clean_tweets(sentence, language: str):
 
@@ -67,19 +67,39 @@ def clean_tweets(sentence, language: str):
             
     return ' '.join(new_words)
 
+def get_similarity_matrix(cleaned_tweets: List[str], method: str):
 
-def get_louvain_partitions(df: pd.DataFrame, language: str):
+    def similarity_using_tf_idf(cleaned_tweets: List[str]):
+        #define and use tf-idf transformation
+        tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0)
+        tf_idf = tf.fit_transform(cleaned_tweets)
+
+        # get cosine similarity matrix
+        cosine_similarity_matrix = linear_kernel(tf_idf, tf_idf)
+        return cosine_similarity_matrix
+
+    def similarity_using_embeddings(texts):
+
+        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        embeddings_all_sentences = model.encode(texts)
+
+        similarity = cosine_similarity(embeddings_all_sentences, embeddings_all_sentences)
+        return similarity
+
+    if method=='tf-idf':
+        return similarity_using_tf_idf(cleaned_tweets)
+    elif method=='embeddings':
+        return similarity_using_embeddings(cleaned_tweets)
+    else:
+        return AssertionError('wrong method name to get similarity matrix')
+
+def get_louvain_partitions(df: pd.DataFrame, language: str, method_similarity: str):
 
     original_tweets = df.tweet.tolist() 
     tweet_ids = df.tweet_id.tolist() 
-    cleaned_tweet = [clean_tweets(one_tweet, language) for one_tweet in original_tweets] 
+    cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in original_tweets] 
 
-    #define and use tf-idf transformation
-    tf = TfidfVectorizer(analyzer='word', ngram_range=(1, 3), min_df=0)
-    tf_idf = tf.fit_transform(cleaned_tweet)
-
-    # get cosine similarity matrix
-    cosine_similarity_matrix = linear_kernel(tf_idf, tf_idf)
+    cosine_similarity_matrix = get_similarity_matrix(cleaned_tweets, method_similarity)
 
     # create graph from similarity matrix
     graph_one_lang = nx.Graph()
@@ -127,19 +147,19 @@ if __name__ == '__main__':
             f'generated_data/sentiments_numbers_{language_tmp}.csv', 
             compression='gzip'
             )
-
+        proportion_kept_data_one_lang = proportions_kept_data[language_tmp]
         n_tweets_one_language = len(sentiments_df_one_language)
-        n_kept_tweets = int(n_tweets_one_language * args.proportion_kept_data)
+        n_kept_tweets = int(n_tweets_one_language * proportion_kept_data_one_lang)
         kept_df = sentiments_df_one_language.sort_values(
             by='overall_negative_sentiment',
             ascending=False,
             inplace=False
             ).head(n_kept_tweets)
 
-        partitioned_df = get_louvain_partitions(kept_df, language_tmp)
+        partitioned_df = get_louvain_partitions(kept_df, language_tmp, args.method_similarity)
 
         partitioned_df.to_csv(
-            f'generated_data/partitions_{language_tmp}.csv', index=None, compression='gzip'
+            f'generated_data/partitions_{language_tmp}_{args.method_similarity}.csv', index=None, compression='gzip'
         )
 
     print('--------------------------------------------------------------------')
