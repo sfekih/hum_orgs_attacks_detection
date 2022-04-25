@@ -20,6 +20,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
 from sentence_transformers import SentenceTransformer
 
+import umap
+import hdbscan
+
 import networkx as nx
 import community.community_louvain as community
 from ast import literal_eval
@@ -30,6 +33,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.1, 'en': 0.02, 'ar': 0.1}")
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 parser.add_argument('--method_similarity', type=str, default="embeddings")
+parser.add_argument('--clustering_method', type=str, default='louvain')
 
 args, _ = parser.parse_known_args()
 
@@ -67,6 +71,10 @@ def clean_tweets(sentence, language: str):
             
     return ' '.join(new_words)
 
+def get_embeddings(texts):
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+    return model.encode(texts)   
+
 def get_similarity_matrix(cleaned_tweets: List[str], method: str):
 
     def similarity_using_tf_idf(cleaned_tweets: List[str]):
@@ -76,20 +84,13 @@ def get_similarity_matrix(cleaned_tweets: List[str], method: str):
 
         # get cosine similarity matrix
         cosine_similarity_matrix = linear_kernel(tf_idf, tf_idf)
-        return cosine_similarity_matrix
-
-    def similarity_using_embeddings(texts):
-
-        model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
-        embeddings_all_sentences = model.encode(texts)
-
-        similarity = cosine_similarity(embeddings_all_sentences, embeddings_all_sentences)
-        return similarity
+        return cosine_similarity_matrix 
 
     if method=='tf-idf':
         return similarity_using_tf_idf(cleaned_tweets)
     elif method=='embeddings':
-        return similarity_using_embeddings(cleaned_tweets)
+        embeddings_all_sentences = get_embeddings(texts)
+        return cosine_similarity(embeddings_all_sentences, embeddings_all_sentences)
     else:
         return AssertionError('wrong method name to get similarity matrix')
 
@@ -135,6 +136,19 @@ def get_louvain_partitions(df: pd.DataFrame, language: str, method_similarity: s
 
     return df_partition
 
+def get_hdbscan_partitions(tweets: List[str]):
+    embeddings = get_embeddings(tweets)
+    umap_embeddings = umap.UMAP(n_neighbors=20,
+                            n_components=6, 
+                            metric='cosine').fit_transform(embeddings)
+
+    cluster = hdbscan.HDBSCAN(min_cluster_size=3,
+                          metric='euclidean',                      
+                          cluster_selection_method='eom').fit(umap_embeddings)
+
+    return cluster.labels_
+
+
 if __name__ == '__main__':
 
     print('--------------------------------------------------------------------------------')
@@ -142,6 +156,8 @@ if __name__ == '__main__':
     print('--------------------------------------------------------------------------------')
 
     for language_tmp in languages:
+
+        print(f'running for the {language_tmp} language')
 
         sentiments_df_one_language = pd.read_csv(
             f'generated_data/sentiments_numbers_{language_tmp}.csv', 
@@ -156,11 +172,17 @@ if __name__ == '__main__':
             inplace=False
             ).head(n_kept_tweets)
 
-        partitioned_df = get_louvain_partitions(kept_df, language_tmp, args.method_similarity)
-
-        partitioned_df.to_csv(
-            f'generated_data/partitions_{language_tmp}_{args.method_similarity}.csv', index=None, compression='gzip'
-        )
+        if args.clustering_method=='louvain':
+            partitioned_df = get_louvain_partitions(kept_df, language_tmp, args.method_similarity)
+            partitioned_df.to_csv(
+                f'generated_data/partitions_{language_tmp}_louvain_{args.method_similarity}.csv', index=None, compression='gzip'
+            )
+        elif args.clustering_method=='hdbscan':
+            partitioned_df = kept_df[['tweet_id', 'sentence']].copy()
+            partitioned_df['partition'] = get_hdbscan_partitions(partitioned_df.tweet.tolist())
+            partitioned_df.to_csv(
+                f'generated_data/partitions_{language_tmp}_hdbscan.csv', index=None, compression='gzip'
+            )
 
     print('--------------------------------------------------------------------')
     print('---------------------- SCRIPT RUN SUCCESSFULLY! --------------------')
