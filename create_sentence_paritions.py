@@ -180,7 +180,7 @@ if __name__ == '__main__':
             )
         elif args.clustering_method=='hdbscan':
             partitioned_df = kept_df[['tweet_id', 'tweet']].rename(
-                columns='tweet': 'sentence'
+                columns={'tweet': 'sentence'}
             ).copy()
             partitioned_df['partition'] = get_hdbscan_partitions(partitioned_df.tweet.tolist())
             partitioned_df.to_csv(
