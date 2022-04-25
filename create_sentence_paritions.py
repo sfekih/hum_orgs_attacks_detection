@@ -20,8 +20,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
 from sentence_transformers import SentenceTransformer
 
-import umap
-import hdbscan
+import umap.umap_ as umap
 
 import networkx as nx
 import community.community_louvain as community
