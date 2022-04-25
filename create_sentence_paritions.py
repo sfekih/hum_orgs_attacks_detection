@@ -89,7 +89,7 @@ def get_similarity_matrix(cleaned_tweets: List[str], method: str):
     if method=='tf-idf':
         return similarity_using_tf_idf(cleaned_tweets)
     elif method=='embeddings':
-        embeddings_all_sentences = get_embeddings(texts)
+        embeddings_all_sentences = get_embeddings(cleaned_tweets)
         return cosine_similarity(embeddings_all_sentences, embeddings_all_sentences)
     else:
         return AssertionError('wrong method name to get similarity matrix')
@@ -175,14 +175,20 @@ if __name__ == '__main__':
         if args.clustering_method=='louvain':
             partitioned_df = get_louvain_partitions(kept_df, language_tmp, args.method_similarity)
             partitioned_df.to_csv(
-                f'generated_data/partitions_{language_tmp}_louvain_{args.method_similarity}.csv', index=None, compression='gzip'
+                f'generated_data/partitions_{language_tmp}_louvain_{args.method_similarity}.csv', 
+                index=None, compression='gzip'
             )
         elif args.clustering_method=='hdbscan':
-            partitioned_df = kept_df[['tweet_id', 'sentence']].copy()
+            partitioned_df = kept_df[['tweet_id', 'tweet']].rename(
+                columns='tweet': 'sentence'
+            ).copy()
             partitioned_df['partition'] = get_hdbscan_partitions(partitioned_df.tweet.tolist())
             partitioned_df.to_csv(
-                f'generated_data/partitions_{language_tmp}_hdbscan.csv', index=None, compression='gzip'
+                f'generated_data/partitions_{language_tmp}_hdbscan.csv', 
+                index=None, compression='gzip'
             )
+        else: 
+            AssertionError('Wrong clustering method name')
 
     print('--------------------------------------------------------------------')
     print('---------------------- SCRIPT RUN SUCCESSFULLY! --------------------')
