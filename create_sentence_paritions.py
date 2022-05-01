@@ -167,10 +167,10 @@ def get_hdbscan_partitions(tweets: List[str]):
 
     return cluster.labels_
 
-def get_topics(tweets: List[str]):
+def get_topics(tweets: List[str], language: str):
     
     vectorizer = CountVectorizer(analyzer='word')
-    cleaned_tweets = [clean_tweets(one_tweet) for one_tweet in tweets]
+    cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in tweets]
     tf = vectorizer.fit_transform(cleaned_tweets).toarray()
 
     number_of_topics = 2
@@ -211,7 +211,7 @@ def get_clusters(
         for cluster_tmp in meaningful_clusters:
             df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
 
-            df_one_cluster['topic'] = get_topics(df_one_cluster.tweet)
+            df_one_cluster['topic'] = get_topics(df_one_cluster.tweet, language)
             final_df = final_df.append(df_one_cluster)
 
         final_df.to_csv(
