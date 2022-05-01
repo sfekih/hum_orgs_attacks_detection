@@ -170,8 +170,8 @@ def get_hdbscan_partitions(tweets: List[str]):
 def get_topics(tweets: List[str]):
     
     vectorizer = CountVectorizer(analyzer='word')
-    clean_tweets = [clean_tweets(one_tweet) for one_tweet in tweets]
-    tf = vectorizer.fit_transform(clean_tweets).toarray()
+    cleaned_tweets = [clean_tweets(one_tweet) for one_tweet in tweets]
+    tf = vectorizer.fit_transform(cleaned_tweets).toarray()
 
     number_of_topics = 2
     lda_model = LatentDirichletAllocation(n_components=number_of_topics, random_state=0)
