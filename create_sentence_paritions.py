@@ -16,9 +16,10 @@ from nltk.stem import PorterStemmer
 porter_stemmer = PorterStemmer()
 stop_words = set(stopwords.words())
 
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
 from sentence_transformers import SentenceTransformer
+from sklearn.decomposition import LatentDirichletAllocation
 
 import umap.umap_ as umap
 import hdbscan
@@ -45,8 +46,25 @@ def clean_tweets(sentence, language: str):
     if type(sentence) is not str:
         sentence = str(sentence)
 
+    #NB: the two functions below were taken from https://ourcodingclub.github.io/tutorials/topic-modelling-python/
+    def remove_links(tweet):
+        '''Takes a string and removes web links from it'''
+        tweet = re.sub(r'http\S+', '', tweet) # remove http links
+        tweet = re.sub(r'bit.ly/\S+', '', tweet) # rempve bitly links
+        tweet = tweet.strip('[link]') # remove [links]
+        return tweet
+
+    def remove_users(tweet):
+        '''Takes a string and removes retweet and @user information'''
+        tweet = re.sub('(RT\s@[A-Za-z]+[A-Za-z0-9-_]+)', '', tweet) # remove retweet
+        tweet = re.sub('(@[A-Za-z]+[A-Za-z0-9-_]+)', '', tweet) # remove tweeted at
+        return tweet
+
     new_words = []
+    sentence = remove_links(sentence) 
+    sentence = remove_users(sentence)
     words = sentence.split()
+
     for word in words:
         
         #lower and remove punctuation
@@ -55,10 +73,9 @@ def clean_tweets(sentence, language: str):
         #keep clean words and remove hyperlinks
         word_not_nothing = new_word != ''
         word_not_stop_word = new_word.lower() not in stop_words
-        word_not_hyperlink = 'https' not in new_word
         #word_not_digit = ~new_word.isdigit()
 
-        if word_not_nothing and word_not_stop_word and word_not_hyperlink:
+        if word_not_nothing and word_not_stop_word:
             if language=='en':
 
                 #lemmatize
@@ -150,6 +167,24 @@ def get_hdbscan_partitions(tweets: List[str]):
 
     return cluster.labels_
 
+def get_topics(tweets: List[str]):
+    
+    vectorizer = CountVectorizer(analyzer='word')
+    clean_tweets = [clean_tweets(one_tweet) for one_tweet in tweets]
+    tf = vectorizer.fit_transform(clean_tweets).toarray()
+
+    number_of_topics = 2
+    lda_model = LatentDirichletAllocation(n_components=number_of_topics, random_state=0)
+
+    lda_model.fit(tf)
+    feature_names = vectorizer.get_feature_names()
+
+    topics = {}
+    for topic_number, topic in enumerate (lda_model.components_):
+        topics[topic_number] = [feature_names[i] for i in (topic.argsort()[-5:])]
+
+    return topics
+
 
 def get_clusters(
     df: pd.DataFrame, 
@@ -159,19 +194,36 @@ def get_clusters(
     ):
 
     labels = df.label.unique()
-    for label in labels:
-        get_clusters_one_df(
-            df, 
+    for one_label in labels:
+        df_one_label = df[df.label==one_label]
+        partitioned_df = get_clusters_one_df(
+            df_one_label, 
             clustering_method,
-            label,
             language, 
             louvain_similarity_method
         )
 
+        clusters = partitioned_df.partition.unique()
+        meaningful_clusters = clusters[clusters>=0]
+
+        final_df = partitioned_df[partitioned_df.partition==-1]
+        final_df['topic'] = 'UNKNOWN'
+        for cluster_tmp in meaningful_clusters:
+            df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
+
+            df_one_cluster['topic'] = get_topics(df_one_cluster.tweet)
+            final_df = final_df.append(df_one_cluster)
+
+        final_df.to_csv(
+            f'generated_data/partitions_{language_tmp}_{clustering_method}_{one_label}.csv', 
+            index=None, compression='gzip'
+        )
+
+
+
 def get_clusters_one_df(
     df: pd.DataFrame, 
     clustering_method: str,
-    sentiment_column: str,
     language: str = None, 
     louvain_similarity_method: str = None
     ):
@@ -195,10 +247,7 @@ def get_clusters_one_df(
     else: 
         AssertionError("Wrong clustering method name, please choose one of ['louvain', 'hdbscan']")
 
-    partitioned_df.to_csv(
-            f'generated_data/partitions_{language_tmp}_{clustering_method}_{sentiment_column}.csv', 
-            index=None, compression='gzip'
-        )
+    return partitioned_df
 
 def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
 
