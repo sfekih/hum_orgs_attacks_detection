@@ -183,7 +183,7 @@ def get_topics(tweets: List[str], language: str):
     for topic_number, topic in enumerate (lda_model.components_):
         topics[topic_number] = [feature_names[i] for i in (topic.argsort()[-5:])]
 
-    return topics
+    return str(topics)
 
 
 def get_clusters(
