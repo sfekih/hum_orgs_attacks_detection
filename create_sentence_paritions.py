@@ -30,10 +30,10 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.1, 'en': 0.02, 'ar': 0.1}")
+parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.05, 'en': 0.05, 'ar': 0.05}")
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 parser.add_argument('--method_similarity', type=str, default="embeddings")
-parser.add_argument('--clustering_method', type=str, default='louvain')
+parser.add_argument('--clustering_method', type=str, default='hdbscan')
 
 args, _ = parser.parse_known_args()
 
@@ -92,7 +92,7 @@ def get_similarity_matrix(cleaned_tweets: List[str], method: str):
         embeddings_all_sentences = get_embeddings(cleaned_tweets)
         return cosine_similarity(embeddings_all_sentences, embeddings_all_sentences)
     else:
-        return AssertionError('wrong method name to get similarity matrix')
+        return AssertionError("wrong method name to get similarity matrix, please choose one in ['tf-idf', 'embeddings]")
 
 def get_louvain_partitions(df: pd.DataFrame, language: str, method_similarity: str):
 
@@ -137,17 +137,92 @@ def get_louvain_partitions(df: pd.DataFrame, language: str, method_similarity: s
     return df_partition
 
 def get_hdbscan_partitions(tweets: List[str]):
+    print('begin getitng embeddings')
     embeddings = get_embeddings(tweets)
-    umap_embeddings = umap.UMAP(n_neighbors=20,
+    print('begin running umap')
+    umap_embeddings = umap.UMAP(n_neighbors=10,
                             n_components=6, 
                             metric='cosine').fit_transform(embeddings)
-
+    print('begin running hdbscan')
     cluster = hdbscan.HDBSCAN(min_cluster_size=3,
                           metric='euclidean',                      
                           cluster_selection_method='eom').fit(umap_embeddings)
 
     return cluster.labels_
 
+
+def get_clusters(
+    df: pd.DataFrame, 
+    clustering_method: str,
+    language: str = None, 
+    louvain_similarity_method: str = None
+    ):
+
+    labels = df.label.unique()
+    for label in labels:
+        get_clusters_one_df(
+            df, 
+            clustering_method,
+            label,
+            language, 
+            louvain_similarity_method
+        )
+
+def get_clusters_one_df(
+    df: pd.DataFrame, 
+    clustering_method: str,
+    sentiment_column: str,
+    language: str = None, 
+    louvain_similarity_method: str = None
+    ):
+
+    """if clustering_method not in ['hdbscan', 'louvain']: 
+        AssertionError("Wrong clustering method name, please choose one of ['louvain', 'hdbscan']")"""
+
+    if clustering_method=='louvain':
+        if louvain_similarity_method is None:
+            AssertionError("'louvain_similarity_method' not provided. Please choose one in ['tf-idf', 'embeddings] for computing similarity") 
+        elif louvain_similarity_method is None:
+            AssertionError("'language' not provided.") 
+        else:
+            partitioned_df = get_louvain_partitions(df, language, louvain_similarity_method)
+           
+    elif clustering_method=='hdbscan':
+
+        partitioned_df = df.copy()
+        partitioned_df['partition'] = get_hdbscan_partitions(partitioned_df.tweet.tolist())
+
+    else: 
+        AssertionError("Wrong clustering method name, please choose one of ['louvain', 'hdbscan']")
+
+    partitioned_df.to_csv(
+            f'generated_data/partitions_{language_tmp}_{clustering_method}_{sentiment_column}.csv', 
+            index=None, compression='gzip'
+        )
+
+def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
+
+    if all([item in df.columns for item in ['offensive', 'anger', 'irony']]):
+        df['anger_offensive_score'] = df['anger'] + df['offensive']
+        anger_offensive_df = df.sort_values(by='anger_offensive_score', inplace=False, ascending=False)[
+            ['tweet_id', 'tweet']
+        ].head(n_kept_tweets)
+        anger_offensive_df['label'] = 'anger_offensive'
+
+        irony_df = df.sort_values(by='irony', inplace=False, ascending=False)[
+            ['tweet_id', 'tweet']
+        ].head(n_kept_tweets)
+        irony_df['label'] = 'irony'
+
+        final_df = pd.concat([anger_offensive_df, irony_df]).drop_duplicates(inplace=False)
+
+    else:
+        final_df = df.sort_values(by='overall_negative_sentiment', inplace=False, ascending=False)[
+            ['tweet_id', 'tweet']
+        ].head(n_kept_tweets)
+        final_df['label'] = 'overall_negative_score'
+
+    return final_df
 
 if __name__ == '__main__':
 
@@ -166,27 +241,15 @@ if __name__ == '__main__':
         proportion_kept_data_one_lang = proportions_kept_data[language_tmp]
         n_tweets_one_language = len(sentiments_df_one_language)
         n_kept_tweets = int(n_tweets_one_language * proportion_kept_data_one_lang)
-        kept_df = sentiments_df_one_language.sort_values(
-            by='overall_negative_sentiment',
-            ascending=False,
-            inplace=False
-            ).head(n_kept_tweets)
 
-        if args.clustering_method=='louvain':
-            partitioned_df = get_louvain_partitions(kept_df, language_tmp, args.method_similarity)
-            partitioned_df.to_csv(
-                f'generated_data/partitions_{language_tmp}_louvain_{args.method_similarity}.csv', 
-                index=None, compression='gzip'
+        relevant_hate_df = get_relevant_hate_df(sentiments_df_one_language, n_kept_tweets)
+
+        get_clusters(
+            df=relevant_hate_df, 
+            clustering_method=args.clustering_method,
+            language=language_tmp, 
+            louvain_similarity_method=args.method_similarity
             )
-        elif args.clustering_method=='hdbscan':
-            partitioned_df = kept_df[['tweet_id', 'tweet']].copy()
-            partitioned_df['partition'] = get_hdbscan_partitions(partitioned_df.tweet.tolist())
-            partitioned_df.to_csv(
-                f'generated_data/partitions_{language_tmp}_hdbscan.csv', 
-                index=None, compression='gzip'
-            )
-        else: 
-            AssertionError('Wrong clustering method name')
 
     print('--------------------------------------------------------------------')
     print('---------------------- SCRIPT RUN SUCCESSFULLY! --------------------')
