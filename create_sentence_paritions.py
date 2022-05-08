@@ -16,6 +16,10 @@ from nltk.stem import PorterStemmer
 porter_stemmer = PorterStemmer()
 stop_words = set(stopwords.words())
 
+en_icrc_stop_words = ['icrc', 'red', 'cross', 'crescent', 'committee', 'redcross']
+for word in en_icrc_stop_words:
+    stop_words.add(word)
+
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
 from sentence_transformers import SentenceTransformer
@@ -31,7 +35,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.05, 'en': 0.05, 'ar': 0.05}")
+parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.05, 'en': 0.02, 'ar': 0.05}")
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 parser.add_argument('--method_similarity', type=str, default="embeddings")
 parser.add_argument('--clustering_method', type=str, default='hdbscan')
@@ -49,6 +53,7 @@ def clean_tweets(sentence, language: str):
     #NB: the two functions below were taken from https://ourcodingclub.github.io/tutorials/topic-modelling-python/
     def remove_links(tweet):
         '''Takes a string and removes web links from it'''
+        tweet = re.sub(r'http', '', tweet)
         tweet = re.sub(r'http\S+', '', tweet) # remove http links
         tweet = re.sub(r'bit.ly/\S+', '', tweet) # rempve bitly links
         tweet = tweet.strip('[link]') # remove [links]
@@ -157,7 +162,7 @@ def get_hdbscan_partitions(tweets: List[str]):
     embeddings = get_embeddings(tweets)
     print('begin running umap')
     umap_embeddings = umap.UMAP(n_neighbors=15,
-                            n_components=8, 
+                            n_components=6, 
                             metric='cosine').fit_transform(embeddings)
     print('begin running hdbscan')
     cluster = hdbscan.HDBSCAN(min_cluster_size=3,
@@ -191,35 +196,31 @@ def get_clusters(
     louvain_similarity_method: str = None
     ):
 
-    labels = df.label.unique()
-    for one_label in labels:
-        df_one_label = df[df.label==one_label]
+    cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in df.tweet]
+    
+    partitioned_df = get_clusters_one_df(
+        df.copy(), 
+        cleaned_tweets,
+        clustering_method,
+        louvain_similarity_method
+    )
+    print('begin the topic modelling')
 
-        cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in df_one_label.tweet]
-        
-        partitioned_df = get_clusters_one_df(
-            df_one_label, 
-            cleaned_tweets,
-            clustering_method,
-            louvain_similarity_method
-        )
-        print('begin the topic modelling')
+    clusters = partitioned_df.partition.unique()
+    meaningful_clusters = clusters[clusters>=0]
 
-        clusters = partitioned_df.partition.unique()
-        meaningful_clusters = clusters[clusters>=0]
+    final_df = partitioned_df[partitioned_df.partition==-1]
+    final_df['topic'] = 'UNKNOWN'
+    for cluster_tmp in meaningful_clusters:
+        df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
 
-        final_df = partitioned_df[partitioned_df.partition==-1]
-        final_df['topic'] = 'UNKNOWN'
-        for cluster_tmp in meaningful_clusters:
-            df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
+        df_one_cluster['topic'] = get_topics(cleaned_tweets)
+        final_df = final_df.append(df_one_cluster)
 
-            df_one_cluster['topic'] = get_topics(cleaned_tweets)
-            final_df = final_df.append(df_one_cluster)
-
-        final_df.to_csv(
-            f'generated_data/partitions_{language_tmp}_{clustering_method}_{one_label}.csv', 
-            index=None, compression='gzip'
-        )
+    final_df.to_csv(
+        f'generated_data/partitions_{language_tmp}_{clustering_method}_final.csv', 
+        index=None, compression='gzip'
+    )
 
 
 
@@ -253,19 +254,12 @@ def get_clusters_one_df(
 
 def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
 
-    if all([item in df.columns for item in ['offensive', 'anger', 'irony']]):
-        df['anger_offensive_score'] = df['anger'] + df['offensive']
-        anger_offensive_df = df.sort_values(by='anger_offensive_score', inplace=False, ascending=False)[
+    if all([item in df.columns for item in ['offensive', 'anger']]):
+        
+        df['overall_negative_sentiment'] = df['anger'] + df['offensive']
+        final_df = df.sort_values(by='overall_negative_sentiment', inplace=False, ascending=False)[
             ['tweet_id', 'tweet']
         ].head(n_kept_tweets)
-        anger_offensive_df['label'] = 'anger_offensive'
-
-        irony_df = df.sort_values(by='irony', inplace=False, ascending=False)[
-            ['tweet_id', 'tweet']
-        ].head(n_kept_tweets)
-        irony_df['label'] = 'irony'
-
-        final_df = pd.concat([anger_offensive_df, irony_df]).drop_duplicates(inplace=False)
 
     else:
         final_df = df.sort_values(by='overall_negative_sentiment', inplace=False, ascending=False)[
