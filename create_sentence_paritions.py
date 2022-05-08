@@ -35,7 +35,7 @@ import argparse
 from tqdm import tqdm
 
 import warnings
-warnings.filterwarnings(action='ignore', category=SettingWithCopyWarning, module='pandas')
+#warnings.filterwarnings(action='ignore', category=SettingWithCopyWarning, module='pandas')
 
 parser = argparse.ArgumentParser()
 
