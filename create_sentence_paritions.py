@@ -86,7 +86,7 @@ def clean_tweets(sentence, language: str):
 
             new_words.append(new_word)
             
-    return ' '.join(new_words)
+    return ' '.join(new_words).rstrip().lstrip()
 
 def get_embeddings(texts):
     model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
@@ -111,11 +111,10 @@ def get_similarity_matrix(cleaned_tweets: List[str], method: str):
     else:
         return AssertionError("wrong method name to get similarity matrix, please choose one in ['tf-idf', 'embeddings]")
 
-def get_louvain_partitions(df: pd.DataFrame, language: str, method_similarity: str):
+def get_louvain_partitions(df: pd.DataFrame, cleaned_tweets: List[str], method_similarity: str):
 
     original_tweets = df.tweet.tolist() 
     tweet_ids = df.tweet_id.tolist() 
-    cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in original_tweets] 
 
     cosine_similarity_matrix = get_similarity_matrix(cleaned_tweets, method_similarity)
 
@@ -157,8 +156,8 @@ def get_hdbscan_partitions(tweets: List[str]):
     print('begin getitng embeddings')
     embeddings = get_embeddings(tweets)
     print('begin running umap')
-    umap_embeddings = umap.UMAP(n_neighbors=10,
-                            n_components=6, 
+    umap_embeddings = umap.UMAP(n_neighbors=15,
+                            n_components=8, 
                             metric='cosine').fit_transform(embeddings)
     print('begin running hdbscan')
     cluster = hdbscan.HDBSCAN(min_cluster_size=3,
@@ -167,10 +166,9 @@ def get_hdbscan_partitions(tweets: List[str]):
 
     return cluster.labels_
 
-def get_topics(tweets: List[str], language: str):
+def get_topics(cleaned_tweets: List[str]):
     
     vectorizer = CountVectorizer(analyzer='word')
-    cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in tweets]
     tf = vectorizer.fit_transform(cleaned_tweets).toarray()
 
     number_of_topics = 2
@@ -189,19 +187,23 @@ def get_topics(tweets: List[str], language: str):
 def get_clusters(
     df: pd.DataFrame, 
     clustering_method: str,
-    language: str = None, 
+    language: str,
     louvain_similarity_method: str = None
     ):
 
     labels = df.label.unique()
     for one_label in labels:
         df_one_label = df[df.label==one_label]
+
+        cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in df_one_label.tweet]
+        
         partitioned_df = get_clusters_one_df(
             df_one_label, 
+            cleaned_tweets,
             clustering_method,
-            language, 
             louvain_similarity_method
         )
+        print('begin the topic modelling')
 
         clusters = partitioned_df.partition.unique()
         meaningful_clusters = clusters[clusters>=0]
@@ -211,7 +213,7 @@ def get_clusters(
         for cluster_tmp in meaningful_clusters:
             df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
 
-            df_one_cluster['topic'] = get_topics(df_one_cluster.tweet, language)
+            df_one_cluster['topic'] = get_topics(cleaned_tweets)
             final_df = final_df.append(df_one_cluster)
 
         final_df.to_csv(
@@ -223,8 +225,8 @@ def get_clusters(
 
 def get_clusters_one_df(
     df: pd.DataFrame, 
+    cleaned_tweets: List[str],
     clustering_method: str,
-    language: str = None, 
     louvain_similarity_method: str = None
     ):
 
@@ -237,12 +239,12 @@ def get_clusters_one_df(
         elif louvain_similarity_method is None:
             AssertionError("'language' not provided.") 
         else:
-            partitioned_df = get_louvain_partitions(df, language, louvain_similarity_method)
+            partitioned_df = get_louvain_partitions(df, cleaned_tweets, louvain_similarity_method)
            
     elif clustering_method=='hdbscan':
 
         partitioned_df = df.copy()
-        partitioned_df['partition'] = get_hdbscan_partitions(partitioned_df.tweet.tolist())
+        partitioned_df['partition'] = get_hdbscan_partitions(cleaned_tweets)
 
     else: 
         AssertionError("Wrong clustering method name, please choose one of ['louvain', 'hdbscan']")
