@@ -161,7 +161,7 @@ def get_hdbscan_partitions(tweets: List[str]):
     print('begin getitng embeddings')
     embeddings = get_embeddings(tweets)
     print('begin running umap')
-    umap_embeddings = umap.UMAP(n_neighbors=15,
+    umap_embeddings = umap.UMAP(n_neighbors=10,
                             n_components=6, 
                             metric='cosine').fit_transform(embeddings)
     print('begin running hdbscan')
@@ -210,11 +210,11 @@ def get_clusters(
     meaningful_clusters = clusters[clusters>=0]
 
     final_df = partitioned_df[partitioned_df.partition==-1]
-    final_df['topic'] = 'UNKNOWN'
+    final_df.loc[:, 'topic'] = 'UNKNOWN'
     for cluster_tmp in meaningful_clusters:
         df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
 
-        df_one_cluster['topic'] = get_topics(cleaned_tweets)
+        df_one_cluster.loc[:, 'topic'] = get_topics(cleaned_tweets)
         final_df = final_df.append(df_one_cluster)
 
     final_df.to_csv(
@@ -277,7 +277,7 @@ if __name__ == '__main__':
 
     for language_tmp in languages:
 
-        print(f'running for the {language_tmp} language')
+        print(f'----------------------- running for the {language_tmp} language')
 
         sentiments_df_one_language = pd.read_csv(
             f'generated_data/sentiments_numbers_{language_tmp}.csv', 
