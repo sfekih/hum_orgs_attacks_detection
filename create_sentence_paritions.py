@@ -32,6 +32,10 @@ import networkx as nx
 import community.community_louvain as community
 from ast import literal_eval
 import argparse
+from tqdm import tqdm
+
+import warnings
+warnings.filterwarnings(action='ignore', category=SettingWithCopyWarning, module='pandas')
 
 parser = argparse.ArgumentParser()
 
@@ -162,7 +166,7 @@ def get_hdbscan_partitions(tweets: List[str]):
     embeddings = get_embeddings(tweets)
     print('begin running umap')
     umap_embeddings = umap.UMAP(n_neighbors=10,
-                            n_components=6, 
+                            n_components=8, 
                             metric='cosine').fit_transform(embeddings)
     print('begin running hdbscan')
     cluster = hdbscan.HDBSCAN(min_cluster_size=3,
@@ -183,7 +187,7 @@ def get_topics(cleaned_tweets: List[str]):
     feature_names = vectorizer.get_feature_names()
 
     topics = {}
-    for topic_number, topic in enumerate (lda_model.components_):
+    for topic_number, topic in tqdm(enumerate (lda_model.components_)):
         topics[topic_number] = [feature_names[i] for i in (topic.argsort()[-5:])]
 
     return str(topics)
@@ -245,7 +249,7 @@ def get_clusters_one_df(
     elif clustering_method=='hdbscan':
 
         partitioned_df = df.copy()
-        partitioned_df['partition'] = get_hdbscan_partitions(cleaned_tweets)
+        partitioned_df.loc[:, 'partition'] = get_hdbscan_partitions(cleaned_tweets)
 
     else: 
         AssertionError("Wrong clustering method name, please choose one of ['louvain', 'hdbscan']")
