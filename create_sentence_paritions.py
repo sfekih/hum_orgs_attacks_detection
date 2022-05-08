@@ -35,7 +35,7 @@ import argparse
 from tqdm import tqdm
 
 import warnings
-warnings.filterwarnings(action='once')
+warnings.filterwarnings(action='ignore')
 
 
 parser = argparse.ArgumentParser()
@@ -205,7 +205,7 @@ def get_clusters(
     
     partitioned_df = get_clusters_one_df(
         df.copy(), 
-        df['cleaned_tweets'],
+        df['cleaned_tweets'].tolist(),
         clustering_method,
         louvain_similarity_method
     )
@@ -219,7 +219,7 @@ def get_clusters(
 
     for cluster_tmp in tqdm(meaningful_clusters):
         df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
-        df_one_cluster.loc[:, 'topic'] = get_topics(df_one_cluster['cleaned_tweets'])
+        df_one_cluster.loc[:, 'topic'] = get_topics(df_one_cluster['cleaned_tweets'].tolist())
         final_df = final_df.append(df_one_cluster)
 
     final_df.to_csv(
@@ -250,7 +250,7 @@ def get_clusters_one_df(
     elif clustering_method=='hdbscan':
 
         partitioned_df = df.copy()
-        partitioned_df.loc[:, 'partition'] = get_hdbscan_partitions(cleaned_tweets)
+        partitioned_df['partition'] = get_hdbscan_partitions(cleaned_tweets)
 
     else: 
         AssertionError("Wrong clustering method name, please choose one of ['louvain', 'hdbscan']")
