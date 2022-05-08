@@ -35,7 +35,8 @@ import argparse
 from tqdm import tqdm
 
 import warnings
-#warnings.filterwarnings(action='ignore', category=SettingWithCopyWarning, module='pandas')
+warnings.filterwarnings(action='once')
+
 
 parser = argparse.ArgumentParser()
 
@@ -187,7 +188,7 @@ def get_topics(cleaned_tweets: List[str]):
     feature_names = vectorizer.get_feature_names()
 
     topics = {}
-    for topic_number, topic in tqdm(enumerate (lda_model.components_)):
+    for topic_number, topic in enumerate (lda_model.components_):
         topics[topic_number] = [feature_names[i] for i in (topic.argsort()[-5:])]
 
     return str(topics)
@@ -200,11 +201,11 @@ def get_clusters(
     louvain_similarity_method: str = None
     ):
 
-    cleaned_tweets = [clean_tweets(one_tweet, language) for one_tweet in df.tweet]
+    df['cleaned_tweets'] = [clean_tweets(one_tweet, language) for one_tweet in df.tweet]
     
     partitioned_df = get_clusters_one_df(
         df.copy(), 
-        cleaned_tweets,
+        df['cleaned_tweets'],
         clustering_method,
         louvain_similarity_method
     )
@@ -215,10 +216,10 @@ def get_clusters(
 
     final_df = partitioned_df[partitioned_df.partition==-1]
     final_df.loc[:, 'topic'] = 'UNKNOWN'
-    for cluster_tmp in meaningful_clusters:
-        df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
 
-        df_one_cluster.loc[:, 'topic'] = get_topics(cleaned_tweets)
+    for cluster_tmp in tqdm(meaningful_clusters):
+        df_one_cluster = partitioned_df[partitioned_df.partition==cluster_tmp]
+        df_one_cluster.loc[:, 'topic'] = get_topics(df_one_cluster['cleaned_tweets'])
         final_df = final_df.append(df_one_cluster)
 
     final_df.to_csv(
