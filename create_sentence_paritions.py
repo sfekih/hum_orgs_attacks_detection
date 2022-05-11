@@ -40,7 +40,7 @@ warnings.filterwarnings(action='ignore')
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.05, 'en': 0.02, 'ar': 0.05}")
+parser.add_argument('--proportion_kept_data', type=str, default="{'fr': 0.05, 'en': 0.05, 'ar': 0.05}")
 parser.add_argument('--trained_languages', type=str, default="['en', 'ar', 'fr']")
 parser.add_argument('--method_similarity', type=str, default="embeddings")
 parser.add_argument('--clustering_method', type=str, default='hdbscan')
@@ -170,7 +170,7 @@ def get_hdbscan_partitions(tweets: List[str]):
                             n_components=8, 
                             metric='cosine').fit_transform(embeddings)
     print('begin running hdbscan')
-    cluster = hdbscan.HDBSCAN(min_cluster_size=3,
+    cluster = hdbscan.HDBSCAN(min_cluster_size=5,
                           metric='euclidean',                      
                           cluster_selection_method='eom').fit(umap_embeddings)
 
