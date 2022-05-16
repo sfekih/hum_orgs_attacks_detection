@@ -392,7 +392,16 @@ def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
 
     final_df = df.sort_values(
         by="overall_negative_sentiment", inplace=False, ascending=False
-    ).head(n_kept_tweets)
+    )[
+        [
+            "tweet_id",
+            "publication_date",
+            "tweet",
+            "overall_negative_sentiment",
+        ]
+    ].head(
+        n_kept_tweets
+    )
 
     return final_df
 
