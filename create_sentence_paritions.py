@@ -36,7 +36,7 @@ import community.community_louvain as community
 from ast import literal_eval
 import argparse
 from tqdm import tqdm
-
+import operator
 import warnings
 
 warnings.filterwarnings(action="ignore")
@@ -148,7 +148,7 @@ def get_similarity_matrix(cleaned_tweets: List[str], method: str):
         return cosine_similarity(embeddings_all_sentences, embeddings_all_sentences)
     else:
         return AssertionError(
-            "wrong method name to get similarity matrix, please choose one in ['tf-idf', 'embeddings]"
+            "wrong method name to get similarity matrix, please choose one in ['tf-idf', 'embeddings']"
         )
 
 
@@ -329,20 +329,53 @@ def get_clusters(
 
     final_df = partitioned_df[partitioned_df.partition == -1]
     final_df.loc[:, "topic"] = "UNKNOWN"
+    df_one_cluster.loc[
+        :, "mean_sentiment_score"
+    ] = df_one_cluster.overall_negative_sentiment
 
     # get topics for tweets being in clusters
     for cluster_tmp in tqdm(meaningful_clusters):
         df_one_cluster = partitioned_df[partitioned_df.partition == cluster_tmp]
+        df_one_cluster.loc[
+            :, "mean_sentiment_score"
+        ] = df_one_cluster.overall_negative_sentiment.mean()
         df_one_cluster.loc[:, "topic"] = get_topics(
             df_one_cluster["cleaned_tweets"].tolist()
         )
         final_df = final_df.append(df_one_cluster)
 
-    final_df.to_csv(
-        f"generated_data/partitions_{language_tmp}_{clustering_method}_final.csv",
-        index=None,
-        compression="gzip",
+    return final_df.drop(columns=["overall_negative_sentiment"], inplace=False)
+
+
+def postprocess_df(df):
+    """
+    Function to postprocess DataFrame.
+    Return dataframe sorted by number of tweets per topic.
+    """
+    df_copy = df.copy()
+
+    df_partitions = (
+        df_copy.groupby("partition", as_index=False)["tweet_id"]
+        .apply(len)
+        .rename(columns={"tweet_id": "cluster_size"})
     )
+    df_partitions.index = df_partitions.partition
+    df_partitions.drop(columns=["partition"], inplace=True)
+    sorted_d = dict(
+        sorted(
+            df_partitions.to_dict()["cluster_size"].items(),
+            key=operator.itemgetter(1),
+            reverse=True,
+        )
+    )
+
+    final_df = pd.DataFrame()
+    for k, v in sorted_d.items():
+        df_one_partition = df[df.partition == k]
+        df_one_partition.loc[:, "cluster_size"] = v
+        final_df = final_df.append(df_one_partition)
+
+    return final_df
 
 
 def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
@@ -352,15 +385,10 @@ def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
     if all([item in df.columns for item in ["offensive", "anger"]]):
 
         df["overall_negative_sentiment"] = df["anger"] + df["offensive"]
-        final_df = df.sort_values(
-            by="overall_negative_sentiment", inplace=False, ascending=False
-        )[["tweet_id", "tweet"]].head(n_kept_tweets)
 
-    else:
-        final_df = df.sort_values(
-            by="overall_negative_sentiment", inplace=False, ascending=False
-        )[["tweet_id", "tweet"]].head(n_kept_tweets)
-        final_df["label"] = "overall_negative_score"
+    final_df = df.sort_values(
+        by="overall_negative_sentiment", inplace=False, ascending=False
+    )[["tweet_id", "tweet", "overall_negative_sentiment"]].head(n_kept_tweets)
 
     return final_df
 
@@ -392,11 +420,19 @@ if __name__ == "__main__":
             sentiments_df_one_language, n_kept_tweets
         )
 
-        get_clusters(
+        df_one_language = get_clusters(
             df=relevant_hate_df,
             clustering_method=args.clustering_method,
             language=language_tmp,
             louvain_similarity_method=args.method_similarity,
+        )
+
+        final_df_one_language = postprocess_df(df_one_language)
+
+        final_df_one_language.to_csv(
+            f"generated_data/partitions_{language_tmp}_{args.clustering_method}_final.csv",
+            index=None,
+            compression="gzip",
         )
 
     print("--------------------------------------------------------------------")

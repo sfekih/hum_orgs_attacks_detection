@@ -37,37 +37,6 @@ def clean_topic(topics):
     return list(set(flatten(list(custom_eval(topics).values()))))
 
 
-def postprocess_df(df):
-    """
-    Function to postprocess DataFrame.
-    Return dataframe sorted by number of tweets per topic.
-    """
-    df_copy = df.copy()
-
-    df_partitions = (
-        df_copy.groupby("partition", as_index=False)["tweet_id"]
-        .apply(len)
-        .rename(columns={"tweet_id": "cluster_size"})
-    )
-    df_partitions.index = df_partitions.partition
-    df_partitions.drop(columns=["partition"], inplace=True)
-    sorted_d = dict(
-        sorted(
-            df_partitions.to_dict()["cluster_size"].items(),
-            key=operator.itemgetter(1),
-            reverse=True,
-        )
-    )
-
-    final_df = pd.DataFrame()
-    for k, v in sorted_d.items():
-        df_one_partition = df[df.partition == k]
-        df_one_partition.loc[:, "cluster_size"] = v
-        final_df = final_df.append(df_one_partition)
-
-    return final_df
-
-
 if __name__ == "__main__":
 
     if not os.path.exists(decompressed_folder_name):
@@ -79,8 +48,6 @@ if __name__ == "__main__":
         print(f"begin decompressing the file: {file}")
 
         df_one_file = pd.read_csv(f"generated_data/{file}", compression="gzip")
-        if "partition" in df_one_file.columns:
-            df_one_file = postprocess_df(df_one_file)
 
         if "topic" in df_one_file:
             df_one_file["topic"] = df_one_file.topic.apply(clean_topic)
