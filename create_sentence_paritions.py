@@ -329,9 +329,7 @@ def get_clusters(
 
     final_df = partitioned_df[partitioned_df.partition == -1]
     final_df.loc[:, "topic"] = "UNKNOWN"
-    df_one_cluster.loc[
-        :, "mean_sentiment_score"
-    ] = df_one_cluster.overall_negative_sentiment
+    final_df.loc[:, "mean_sentiment_score"] = final_df.overall_negative_sentiment
 
     # get topics for tweets being in clusters
     for cluster_tmp in tqdm(meaningful_clusters):
