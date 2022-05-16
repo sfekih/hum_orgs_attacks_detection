@@ -27,6 +27,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import linear_kernel, cosine_similarity
 from sentence_transformers import SentenceTransformer
 from sklearn.decomposition import LatentDirichletAllocation
+from scipy.stats import norm
 
 import umap.umap_ as umap
 import hdbscan
@@ -327,9 +328,12 @@ def get_clusters(
     clusters = partitioned_df.partition.unique()
     meaningful_clusters = clusters[clusters >= 0]
 
-    final_df = partitioned_df[partitioned_df.partition == -1]
-    final_df.loc[:, "topic"] = "UNKNOWN"
-    final_df.loc[:, "mean_sentiment_score"] = final_df.overall_negative_sentiment
+    if -1 in clusters:
+        final_df = partitioned_df[partitioned_df.partition == -1]
+        final_df.loc[:, "topic"] = "UNKNOWN"
+        final_df.loc[:, "mean_sentiment_score"] = final_df.overall_negative_sentiment
+    else:
+        final_df = pd.DataFrame()
 
     # get topics for tweets being in clusters
     for cluster_tmp in tqdm(meaningful_clusters):
@@ -380,13 +384,19 @@ def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
     """
     filter out the relevant tweets: tweets with highest negative score.
     """
-    if all([item in df.columns for item in ["offensive", "anger"]]):
-
-        df["overall_negative_sentiment"] = df["anger"] + df["offensive"]
+    final_df = df.copy()
+    if all([item in final_df.columns for item in ["offensive", "anger"]]):
+        final_df["overall_negative_sentiment"] = 0.5 * (
+            final_df["anger"] + final_df["offensive"]
+        )
 
     final_df = df.sort_values(
         by="overall_negative_sentiment", inplace=False, ascending=False
     )[["tweet_id", "tweet", "overall_negative_sentiment"]].head(n_kept_tweets)
+
+    final_df["overall_negative_sentiment"] = final_df.overall_negative_sentiment.apply(
+        lambda x: np.round(norm(0, 1).cdf(x), 3)
+    )
 
     return final_df
 
