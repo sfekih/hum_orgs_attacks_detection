@@ -58,7 +58,7 @@ languages = literal_eval(args.trained_languages)
 proportions_kept_data = literal_eval(args.proportion_kept_data)
 
 
-def clean_tweets(sentence, language: str):
+def clean_one_tweet(sentence, language: str, remove_users):
     """
     function to clean tweets:
     1) remove links
@@ -87,7 +87,10 @@ def clean_tweets(sentence, language: str):
 
     new_words = []
     sentence = remove_links(sentence)
-    sentence = remove_users(sentence)
+    if remove_users:
+        sentence = remove_users(sentence)
+    else:
+        sentence = re.sub("@", "", sentence)
     words = sentence.split()
 
     for word in words:
@@ -111,6 +114,12 @@ def clean_tweets(sentence, language: str):
             new_words.append(new_word)
 
     return " ".join(new_words).rstrip().lstrip()
+
+
+def clean_tweets(all_tweets: List[str], language: str, remove_users=True):
+    return [
+        clean_one_tweet(one_tweet, language, remove_users) for one_tweet in all_tweets
+    ]
 
 
 def get_embeddings(texts):
@@ -298,7 +307,7 @@ def get_clusters(
     louvain_similarity_method: str = None,
 ):
     """
-    Main function for clustering.....................
+    Main function for clustering.
     INPUTS:
         -df: original DataFrame
         - clustering_method: method we use for clustering tweets: can be 'louvain' or 'hdbscan'.
@@ -314,7 +323,7 @@ def get_clusters(
     """
 
     # preprocess tweets
-    df["cleaned_tweets"] = [clean_tweets(one_tweet, language) for one_tweet in df.tweet]
+    df["cleaned_tweets"] = clean_tweets(df.tweet, language)
 
     # get clustters
     partitioned_df = get_clusters_one_df(
@@ -342,7 +351,7 @@ def get_clusters(
             :, "mean_sentiment_score"
         ] = df_one_cluster.overall_negative_sentiment.mean()
         df_one_cluster.loc[:, "topic"] = get_topics(
-            df_one_cluster["cleaned_tweets"].tolist()
+            clean_tweets(df_one_cluster.tweet, language, remove_users=False)
         )
         final_df = final_df.append(df_one_cluster)
 
