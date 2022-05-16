@@ -392,11 +392,7 @@ def get_relevant_hate_df(df: pd.DataFrame, n_kept_tweets: int):
 
     final_df = df.sort_values(
         by="overall_negative_sentiment", inplace=False, ascending=False
-    )[["tweet_id", "tweet", "overall_negative_sentiment"]].head(n_kept_tweets)
-
-    final_df["overall_negative_sentiment"] = final_df.overall_negative_sentiment.apply(
-        lambda x: np.round(norm(0, 1).cdf(x), 3)
-    )
+    ).head(n_kept_tweets)
 
     return final_df
 
