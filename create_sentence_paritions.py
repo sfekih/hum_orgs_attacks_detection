@@ -128,7 +128,9 @@ def get_embeddings(texts):
     """
     get all tweets embeddings, one embedding per tweet
     """
-    model = SentenceTransformer("sentence-transformers/use-cmlm-multilingual")
+    model = SentenceTransformer(
+        "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    )
     return model.encode(texts)
 
 
