@@ -20,6 +20,8 @@ porter_stemmer = PorterStemmer()
 stop_words = set(stopwords.words())
 
 en_icrc_stop_words = ["icrc", "red", "cross", "crescent", "committee", "redcross"]
+ar_icrc_stop_words = ["الأحمر", "الهلال", "الصليب", "الاحمر"]
+
 for word in en_icrc_stop_words:
     stop_words.add(word)
 
@@ -126,7 +128,7 @@ def get_embeddings(texts):
     """
     get all tweets embeddings, one embedding per tweet
     """
-    model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    model = SentenceTransformer("sentence-transformers/use-cmlm-multilingual")
     return model.encode(texts)
 
 
