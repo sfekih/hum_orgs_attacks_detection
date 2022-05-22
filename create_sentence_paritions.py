@@ -206,7 +206,7 @@ def get_louvain_partitions(
 
     df_partition = pd.DataFrame(
         list(zip(ids, tweets, partitions)),
-        columns=["tweet_id", "sentence", "partition"],
+        columns=["tweet_id", "sentence", "partition", "overall_negative_sentiment"],
     ).sort_values(by="partition", inplace=False)
 
     return df_partition
