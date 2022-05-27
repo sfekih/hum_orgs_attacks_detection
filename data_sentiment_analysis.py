@@ -18,7 +18,7 @@ kept_sentiments = ["offensive", "anger"]
 parser = argparse.ArgumentParser()
 
 parser.add_argument("--use_sample", type=str, default="false")
-parser.add_argument("--data_path", type=str, default="data/clean_data_march.csv")
+parser.add_argument("--data_path", type=str, default="data/clean_data.csv")
 parser.add_argument("--trained_languages", type=str, default="['en', 'ar', 'fr']")
 
 args, _ = parser.parse_known_args()
