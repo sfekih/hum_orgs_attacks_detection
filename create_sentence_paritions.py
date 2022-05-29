@@ -1,9 +1,7 @@
 from typing import List
-import numpy as np
 import pandas as pd
 
 import re
-import json
 
 import nltk
 
@@ -67,6 +65,8 @@ def clean_one_tweet(sentence, language: str, remove_users):
     2) remove users
     3) lower and remove punctuation
     4) stem and lemmatize if english language
+
+    NB: This function contains many expressions taken from different sources.
     """
 
     if type(sentence) is not str:
