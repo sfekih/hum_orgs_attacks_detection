@@ -1,5 +1,5 @@
-# Selim Fekih, 288330, Semster project, 
-# Detecting tweet based attacks against humanitarian organisations
+# Selim Fekih
+### This project's purpose is to Detect tweet based attacks against humanitarian organisations (ICRC more specifically).
 
 ## project structure
 ```
@@ -31,7 +31,7 @@ python data_sentiment_analysis.py
   --data_path: str      data path of original data
   --trained_languages   languages trained on
 ```
-### 3) Run multitask LSTM
+### 3) Create sentence partitions to get final clusters
 ```
 python create_sentence_partitions.py
   --proportion_kept_data        Prportion of data to be kept for each language
